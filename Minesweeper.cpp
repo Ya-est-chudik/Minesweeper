@@ -1,8 +1,13 @@
 #include <iostream> // используется в основном для отправки ошибок в консоль
 #include <cstdlib>
+#include <cstring>
+
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_image.h>
+
+#define KEY_SEEN 1
+#define KEY_DOWN 2
 
 void must_init(bool initialization, const char* module) {
   if (initialization) {
@@ -36,10 +41,10 @@ struct CELL { // Клетка сапера
 };
 
 int main() {
-  srand(0);
   must_init(al_init(), "Allegro");
   must_init(al_install_keyboard(), "Keyboard");
   must_init(al_init_image_addon(), "Image addon");
+  must_init(al_install_mouse(), "mouse");
 
   ALLEGRO_TIMER* timer = al_create_timer(1.0 / 30.0);
   must_init(timer, "Timer");
@@ -52,6 +57,9 @@ int main() {
   
   ALLEGRO_FONT* font = al_create_builtin_font();
   must_init(font, "Font");
+  
+  ALLEGRO_MOUSE_STATE msestate;
+  ALLEGRO_KEYBOARD_STATE kbdstate;
   
   ALLEGRO_BITMAP* bg = al_load_bitmap("images/cells/background.png");
   ALLEGRO_BITMAP* cCONV = al_load_bitmap("images/cells/not_oppened_cell(convex).png");
@@ -71,10 +79,17 @@ int main() {
   al_register_event_source(queue, al_get_keyboard_event_source());
   al_register_event_source(queue, al_get_display_event_source(disp));
   al_register_event_source(queue, al_get_timer_event_source(timer));
+  al_register_event_source(queue, al_get_mouse_event_source());
 
   bool done = false;
   bool redraw = true;
   ALLEGRO_EVENT event;
+  
+  float mouse_x = 0;
+  float mouse_y = 0;
+  
+  unsigned char key[ALLEGRO_KEY_MAX];
+  std::memset(key, 0, sizeof(key));
 
   uint16_t pg_x_size = 16;
   uint16_t pg_y_size = 16; // В будущем для настройки размеров поля
@@ -109,12 +124,49 @@ int main() {
   al_start_timer(timer);
   while(true) {
     al_wait_for_event(queue, &event);
+    al_get_mouse_state(&msestate);
+    al_get_keyboard_state(&kbdstate);
     
     switch (event.type) { // ALLEGRO_EVENT_KEY_DOWN - нажатие любой клавиши пользователем
       case ALLEGRO_EVENT_TIMER:
+        if(al_key_down(&kbdstate, ALLEGRO_KEY_ESCAPE)) {
+          done = true;
+        }
+        
+        for (uint16_t i = 0; i < 16; i++) {
+          for (uint16_t j = 0; j < 16; j++) {
+            CELL* b = &playground[i][j];
+            bool mouse_inside = (mouse_x >= b->x && mouse_x <= b->x + 20 && mouse_y >= b->y && mouse_y <= b->y + 20);
+            if (mouse_inside && b->vis_type == CT_CONC) {
+              b->vis_type = CT_CONV;
+            } else if (!mouse_inside && b->vis_type == CT_CONV) {
+              b->vis_type = CT_CONC;
+            }
+            if (mouse_inside && al_mouse_button_down(&msestate, 1)) {
+              b->vis_type = b->invis_type;
+            }
+          }
+        }
+        
+        for(int i = 0; i < ALLEGRO_KEY_MAX; i++) {
+          key[i] &= ~KEY_SEEN;
+        }
+  
         redraw = true;
         break;
-
+        
+      case ALLEGRO_EVENT_MOUSE_AXES:
+        mouse_x = event.mouse.x;
+        mouse_y = event.mouse.y;
+        break;
+        
+      case ALLEGRO_EVENT_KEY_DOWN:
+        key[event.keyboard.keycode] = KEY_SEEN | KEY_DOWN;
+        break;
+      case ALLEGRO_EVENT_KEY_UP:
+        key[event.keyboard.keycode] &= ~KEY_DOWN;
+        break;
+        
       // case ALLEGRO_EVENT_KEY_DOWN:
       case ALLEGRO_EVENT_DISPLAY_CLOSE:
         done = true;
@@ -134,7 +186,43 @@ int main() {
           CELL* b = &playground[i][j];
           switch(b->vis_type) {
             case CT_CONC:
+              al_draw_bitmap(cCONV, b->x, b->y, 0);
+              break;
+            case CT_CONV:
               al_draw_bitmap(cCONC, b->x, b->y, 0);
+              break;
+            case CT_WOANY:
+              al_draw_bitmap(cWOANY, b->x, b->y, 0);
+              break;
+            case CT_WONE:
+              al_draw_bitmap(cWONE, b->x, b->y, 0);
+              break;
+            case CT_WTWO:
+              al_draw_bitmap(cWTWO, b->x, b->y, 0);
+              break;
+            case CT_WTHREE:
+              al_draw_bitmap(cWTHREE, b->x, b->y, 0);
+              break;
+            case CT_WFOUR:
+              al_draw_bitmap(cWFOUR, b->x, b->y, 0);
+              break;
+            case CT_WFIVE:
+              al_draw_bitmap(cWFIVE, b->x, b->y, 0);
+              break;
+            case CT_WSIX:
+              al_draw_bitmap(cWSIX, b->x, b->y, 0);
+              break;
+            case CT_WSEVEN:
+              al_draw_bitmap(cWSEVEN, b->x, b->y, 0);
+              break;
+            case CT_WEIGHT:
+              al_draw_bitmap(cWEIGHT, b->x, b->y, 0);
+              break;
+            case CT_MINE:
+              al_draw_bitmap(cMINE, b->x, b->y, 0);
+              break;
+            case CT_FLAG:
+              al_draw_bitmap(cFLAG_RU, b->x, b->y, 0);
               break;
           }
         }
