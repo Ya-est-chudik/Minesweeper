@@ -1,6 +1,7 @@
 #include <iostream> // используется в основном для отправки ошибок в консоль
 #include <cstdlib>
 #include <cstring>
+#include <random>
 
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_font.h>
@@ -41,6 +42,10 @@ struct CELL { // Клетка сапера
 };
 
 int main() {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<> dist(0, 1);
+  
   must_init(al_init(), "Allegro");
   must_init(al_install_keyboard(), "Keyboard");
   must_init(al_init_image_addon(), "Image addon");
@@ -107,7 +112,7 @@ int main() {
       b->x = new_cell_x;
       b->y = new_cell_y;
       b->vis_type = CT_CONC;
-      b->invis_type = static_cast<uint16_t>((rand() % 2) * 9);
+      b->invis_type = static_cast<uint16_t>(dist(gen) ? 9 : 0);
       new_cell_x += 20;
     }
     new_cell_x = 80;
@@ -122,6 +127,7 @@ int main() {
     std::cout << std::endl;
   }
   al_start_timer(timer);
+  
   while(true) {
     al_wait_for_event(queue, &event);
     al_get_mouse_state(&msestate);
@@ -144,6 +150,9 @@ int main() {
             }
             if (mouse_inside && al_mouse_button_down(&msestate, 1)) {
               b->vis_type = b->invis_type;
+            }
+            if (mouse_inside && al_mouse_button_down(&msestate, 2)) {
+              b->vis_type = CT_FLAG;
             }
           }
         }
