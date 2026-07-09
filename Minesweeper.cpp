@@ -2,21 +2,15 @@
 #include <cstdlib>
 #include <cstring>
 #include <random>
+#include <chrono>
+#include <thread> 
 
 #include <allegro5/allegro5.h>
-#include <allegro5/allegro_font.h>
 #include <allegro5/allegro_image.h>
-
+#include <allegro5/allegro_font.h>
+// g++ Minesweeper.cpp -o Minesweeper.exe -lallegro -lallegro_image -lallegro_font - команда сборки программы
 #define KEY_SEEN 1
 #define KEY_DOWN 2
-
-void must_init(bool initialization, const char* module) {
-  if (initialization) {
-    return;
-  }
-  std::cout << module << " init error" << std::endl;
-  std::exit(1);
-}
 
 enum CELL_TYPE {
   CT_WOANY,
@@ -41,10 +35,60 @@ struct CELL { // Клетка сапера
   uint16_t invis_type;
 };
 
+uint16_t count_mines(CELL** playground, int16_t i, int16_t j) {
+  uint16_t mine_count = 0;
+    
+  for (int16_t di = -1; di <= 1; di++) {               // Вайбкокод
+    for (int16_t dj = -1; dj <= 1; dj++) {             // Вайбкокод
+      if (di == 0 && dj == 0) {                         // Вайбкокод
+        continue;                                       // Вайбкокод
+      }                                                 // Вайбкокод
+      int16_t ni = i + di;                             // Вайбкокод
+      int16_t nj = j + dj;                             // Вайбкокод
+          
+      if (ni >= 0 && ni < 16 && nj >= 0 && nj < 16) {   // Вайбкокод
+        if (playground[ni][nj].invis_type == CT_MINE) { // Вайбкокод
+          mine_count++;                                 // Вайбкокод
+        }
+      }
+    }   
+  }
+  return mine_count;
+}
+
+void first_click_opening(CELL** playground, int16_t i, int16_t j) {
+  playground[i][j].vis_type = playground[i][j].invis_type;
+  if (playground[i][j].invis_type != CT_WOANY) {
+    return;
+  }
+  for (int16_t di = -1; di < 2; di++) {
+    for (int16_t dj = -1; dj < 2; dj++) {
+      if (di == 0 && dj == 0) {
+        continue;
+      }
+      int16_t ni = i + di;
+      int16_t nj = j + dj;
+      if (ni > -1 && ni < 16 && nj > -1 && nj < 16) {
+        if (playground[ni][nj].vis_type == CT_CONC || playground[ni][nj].vis_type == CT_CONV) {
+          first_click_opening(playground, ni, nj);
+        }
+      }
+    }
+  }
+}
+
+void must_init(bool initialization, const char* module) {
+  if (initialization) {
+    return;
+  }
+  std::cout << module << " init error" << std::endl;
+  std::exit(1);
+}
+
 int main() {
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_int_distribution<> dist(0, 1);
+  std::uniform_int_distribution<> dist(0, 15);
   
   must_init(al_init(), "Allegro");
   must_init(al_install_keyboard(), "Keyboard");
@@ -90,14 +134,17 @@ int main() {
   bool redraw = true;
   ALLEGRO_EVENT event;
   
+  bool first_click = true;
+  
   float mouse_x = 0;
   float mouse_y = 0;
   
-  unsigned char key[ALLEGRO_KEY_MAX];
-  std::memset(key, 0, sizeof(key));
+  bool wpressed_1 = 0;
+  bool wpressed_2 = 0;
 
   uint16_t pg_x_size = 16;
   uint16_t pg_y_size = 16; // В будущем для настройки размеров поля
+  
   uint16_t new_cell_x = 80;
   uint16_t new_cell_y = 80;
   
@@ -112,11 +159,60 @@ int main() {
       b->x = new_cell_x;
       b->y = new_cell_y;
       b->vis_type = CT_CONC;
-      b->invis_type = static_cast<uint16_t>(dist(gen) ? 9 : 0);
+      b->invis_type = CT_WOANY;
       new_cell_x += 20;
     }
     new_cell_x = 80;
     new_cell_y += 20;
+  }
+  
+  for (uint32_t i = 0; i < 55; ++i) {
+    uint32_t xm = dist(gen);
+    uint32_t ym = dist(gen);
+    if (playground[xm][ym].invis_type == CT_MINE) {
+      i--;
+      continue;
+    }
+    playground[xm][ym].invis_type = CT_MINE;
+  }
+  
+  for (uint16_t i = 0; i < 16; ++i) {
+    for (uint16_t j = 0; j < 16; ++j) {
+      CELL* b = &playground[i][j];
+    
+      if (b->invis_type == CT_MINE) {
+        continue;
+      }
+        
+      uint16_t mine_count = count_mines(playground, i, j);
+        
+      switch (mine_count) {
+        case 1:  
+          b->invis_type = CT_WONE; 
+          break;
+        case 2:  
+          b->invis_type = CT_WTWO; 
+          break;
+        case 3:  
+          b->invis_type = CT_WTHREE; 
+          break;
+        case 4:  
+          b->invis_type = CT_WFOUR; 
+          break;
+        case 5:  
+          b->invis_type = CT_WFIVE; 
+          break;
+        case 6:  
+          b->invis_type = CT_WSIX; 
+          break;
+        case 7:  
+          b->invis_type = CT_WSEVEN; 
+          break;
+        case 8:  
+          b->invis_type = CT_WEIGHT; 
+          break;
+      }
+    }
   }
   
   for (uint16_t i = 0; i < 16; ++i) {
@@ -126,6 +222,7 @@ int main() {
     }
     std::cout << std::endl;
   }
+  
   al_start_timer(timer);
   
   while(true) {
@@ -133,7 +230,7 @@ int main() {
     al_get_mouse_state(&msestate);
     al_get_keyboard_state(&kbdstate);
     
-    switch (event.type) { // ALLEGRO_EVENT_KEY_DOWN - нажатие любой клавиши пользователем
+    switch (event.type) {
       case ALLEGRO_EVENT_TIMER:
         if(al_key_down(&kbdstate, ALLEGRO_KEY_ESCAPE)) {
           done = true;
@@ -142,23 +239,14 @@ int main() {
         for (uint16_t i = 0; i < 16; i++) {
           for (uint16_t j = 0; j < 16; j++) {
             CELL* b = &playground[i][j];
-            bool mouse_inside = (mouse_x >= b->x && mouse_x <= b->x + 20 && mouse_y >= b->y && mouse_y <= b->y + 20);
+            bool mouse_inside = mouse_x > b->x && mouse_x < b->x + 20 && mouse_y > b->y && mouse_y < b->y + 20;
+            
             if (mouse_inside && b->vis_type == CT_CONC) {
               b->vis_type = CT_CONV;
             } else if (!mouse_inside && b->vis_type == CT_CONV) {
               b->vis_type = CT_CONC;
             }
-            if (mouse_inside && al_mouse_button_down(&msestate, 1)) {
-              b->vis_type = b->invis_type;
-            }
-            if (mouse_inside && al_mouse_button_down(&msestate, 2)) {
-              b->vis_type = CT_FLAG;
-            }
           }
-        }
-        
-        for(int i = 0; i < ALLEGRO_KEY_MAX; i++) {
-          key[i] &= ~KEY_SEEN;
         }
   
         redraw = true;
@@ -169,14 +257,30 @@ int main() {
         mouse_y = event.mouse.y;
         break;
         
-      case ALLEGRO_EVENT_KEY_DOWN:
-        key[event.keyboard.keycode] = KEY_SEEN | KEY_DOWN;
-        break;
-      case ALLEGRO_EVENT_KEY_UP:
-        key[event.keyboard.keycode] &= ~KEY_DOWN;
-        break;
+      case ALLEGRO_EVENT_MOUSE_BUTTON_UP:
+        for (uint16_t i = 0; i < 16; i++) {
+          for (uint16_t j = 0; j < 16; j++) {
+            CELL* b = &playground[i][j];
+            bool mouse_inside = mouse_x > b->x && mouse_x < b->x + 20 && mouse_y > b->y && mouse_y < b->y + 20;
+            
+            if (event.mouse.button == 1 && mouse_inside && (b->vis_type == CT_CONV || b->vis_type == CT_CONC)) {
+              if (first_click && b->invis_type == CT_WOANY) {
+                first_click_opening(playground, i, j);
+              }
+              b->vis_type = b->invis_type;
+            }
+            
+            if (event.mouse.button == 2 && mouse_inside && (b->vis_type == CT_CONV || b->vis_type == CT_CONC)) {
+              b->vis_type = CT_FLAG;
+            } else if (event.mouse.button == 2 && mouse_inside && b->vis_type == CT_FLAG) {
+              b->vis_type = CT_CONC;
+            }
+            
+          }
+        }
         
-      // case ALLEGRO_EVENT_KEY_DOWN:
+        break;
+    
       case ALLEGRO_EVENT_DISPLAY_CLOSE:
         done = true;
         break;
